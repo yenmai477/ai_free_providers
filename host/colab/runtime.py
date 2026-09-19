@@ -124,7 +124,9 @@ def run(
             "LITELLM_CONFIG": str(litellm_config),
             "LITELLM_PORT": str(settings.litellm_port),
             "OLLAMA_LOG": ollama_log,
-            "LITELLM_LOG": litellm_log,
+            "GATEWAY_LITELLM_LOGFILE": litellm_log,
+            # LiteLLM interprets LITELLM_LOG as log LEVEL (INFO/DEBUG), not a path
+            "LITELLM_LOG": "INFO",
             "CLOUDFLARED_LOG": cloudflared_log,
             "MODEL_ID": model_id,
             "OLLAMA_NUM_CTX": str(context),
