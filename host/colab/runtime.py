@@ -101,7 +101,9 @@ def run(
 
     write_litellm_config(litellm_config, model_id, model, settings)
 
+    bin_dir = str(Path.home() / ".local" / "bin")
     env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:/usr/local/bin:{env.get('PATH', '')}"
     env.update(
         {
             "OLLAMA_MODEL": model.model,
@@ -113,13 +115,25 @@ def run(
             "CLOUDFLARED_LOG": cloudflared_log,
             "MODEL_ID": model_id,
             "OLLAMA_NUM_CTX": str(context),
+            "PYTHON_BIN": sys.executable,
+            "BIN_DIR": bin_dir,
         }
     )
 
     common = root / "host" / "common"
-    subprocess.run(["bash", str(common / "stop.sh")], env=env, check=False)
+
+    def _run_script(path: Path, *, check: bool) -> None:
+        # Live logs in Colab; capture only when debugging failures is needed.
+        result = subprocess.run(["bash", str(path)], env=env)
+        if result.returncode != 0 and check:
+            raise RuntimeError(
+                f"{path.name} failed (exit {result.returncode}). "
+                f"Check /tmp/ollama.log /tmp/litellm.log /tmp/cloudflared.log"
+            )
+
+    _run_script(common / "stop.sh", check=False)
     time.sleep(1)
-    subprocess.run(["bash", str(common / "start.sh")], env=env, check=True)
+    _run_script(common / "start.sh", check=True)
 
     print("[runtime] waiting for Ollama…")
     wait_for_ollama()
@@ -130,7 +144,7 @@ def run(
         base=f"http://127.0.0.1:{settings.litellm_port}", api_key=api_key
     )
 
-    subprocess.run(["bash", str(common / "tunnel.sh")], env=env, check=True)
+    _run_script(common / "tunnel.sh", check=True)
     print("[runtime] waiting for Cloudflare URL…")
     public_url = wait_for_tunnel_url(Path(cloudflared_log), timeout_s=90.0)
 

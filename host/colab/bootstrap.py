@@ -38,7 +38,23 @@ def ensure_gateway_api_key() -> str:
 
 def run_install_script(repo_root: Path) -> None:
     script = repo_root / "host" / "common" / "install.sh"
-    subprocess.run(["bash", str(script)], check=True)
+    env = os.environ.copy()
+    env["PYTHON_BIN"] = sys.executable
+    env["BIN_DIR"] = str(Path.home() / ".local" / "bin")
+    # Prepend user bin so cloudflared/ollama are found in later steps
+    env["PATH"] = f"{env['BIN_DIR']}:/usr/local/bin:{env.get('PATH', '')}"
+    # Stream install output live (Colab); still fail with clear message.
+    print(f"[bootstrap] Running {script} with PYTHON_BIN={sys.executable}")
+    result = subprocess.run(
+        ["bash", str(script)],
+        env=env,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"install.sh failed (exit {result.returncode}). "
+            "Scroll up for [install] logs. Common fixes: enable GPU runtime, "
+            "re-run the cell, or set skip_install=True after a manual install."
+        )
 
 
 def chmod_scripts(repo_root: Path) -> None:

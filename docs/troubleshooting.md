@@ -1,5 +1,28 @@
 # Troubleshooting
 
+## `install.sh` exit status 1 (Colab)
+
+Re-run the READY cell after pulling the latest scripts. The bootstrap now prints full `[install]` logs.
+
+Typical causes:
+- **cloudflared Permission denied** writing `/usr/local/bin` — fixed by installing to `~/.local/bin`
+- **pip / Python 3.13** — install uses the notebook’s `sys.executable` and `--break-system-packages` when needed
+- **Ollama install network flake** — re-run the cell; Ollama download is large
+
+Manual recovery in a Colab cell:
+
+```python
+import os, sys
+os.environ["PYTHON_BIN"] = sys.executable
+!bash /content/ai_free_providers/host/common/install.sh
+```
+
+Then:
+
+```python
+result = runtime.run(..., skip_install=True)
+```
+
 ## `config/models.yaml` not found
 
 Clone/upload the full repo into Colab. Set `REPO_ROOT` in the notebook if needed.
