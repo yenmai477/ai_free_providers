@@ -6,7 +6,9 @@ Zero-cost path for coding clients:
 Client → Cloudflare Quick Tunnel → LiteLLM → Ollama → exactly one model
 ```
 
-Phase 1 vertical slice: **Colab T4 → Ollama → qwen3-8b → LiteLLM → tunnel → curl**.
+Phase 1 vertical slice is proven; notebook now exposes **all registry models** (still one per runtime):
+
+`qwen3-4b` … `qwen3-14b` (see `config/models.yaml` / notebook dropdown).
 
 ## Quick start (Colab)
 
@@ -92,6 +94,28 @@ curl.exe -sS "$env:ANTHROPIC_BASE_URL/v1/messages" `
 ```
 
 **Re-run Colab after `git pull`** so LiteLLM regenerates aliases (`qwen3-8b-claude` + default Claude model ids → same Ollama backend).
+
+### Claude Code phải đọc được repo
+
+Claude Code **chỉ đọc file local** khi:
+1. Bạn `cd` vào thư mục project rồi chạy `claude`
+2. Accept **workspace trust**
+3. Model **gọi tool** `Read` / `Glob` / `Grep` (không chỉ trả lời text)
+
+```powershell
+cd D:\MY_CODE\ai_free_providers
+claude
+```
+
+Trong session, hỏi rõ:
+
+```text
+Use the Read tool to open README.md and CLAUDE.md, then summarize this repo.
+```
+
+Repo đã có `.claude/settings.json` (allow Read/Glob/Grep) và `CLAUDE.md`.
+
+Nếu model vẫn nói *"I cannot access files"* → đó là **Qwen không emit tool_use** qua gateway (không phải repo bị khóa). Khi đó dùng Cursor Agent hoặc Claude Anthropic thật để đọc code; hoặc thử model lớn hơn trên Colab (`qwen3-14b`).
 
 ## Local development
 

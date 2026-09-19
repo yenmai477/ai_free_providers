@@ -37,3 +37,12 @@ def test_litellm_config_dict_single_entry():
     names = {m["model_name"] for m in cfg["model_list"]}
     assert "qwen3-8b" in names
     assert "qwen3-8b-claude" in names
+
+
+def test_non_qwen_omits_think_flag():
+    reg = load_registry(CONFIG_DIR)
+    model = reg.models["llama3-8b"]
+    cfg = litellm_config_dict("llama3-8b", model, reg.settings)
+    params = cfg["model_list"][0]["litellm_params"]
+    assert "think" not in params
+    assert params["model"] == "ollama_chat/llama3.1:8b"

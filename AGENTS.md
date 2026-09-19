@@ -34,9 +34,10 @@ The model is selected before startup.
 The notebook must not download or load
 unselected models.
 
-## Phase 1 focus
+## Phase focus
 
-Vertical slice only: Colab T4 → Ollama → qwen3-8b → LiteLLM → Cloudflare Quick Tunnel → curl e2e.
+Any registry model allowed on the selected host (one model per Colab session).
+Default smoke path: Colab T4 → qwen3-8b → LiteLLM → Cloudflare → curl / Claude Code.
 
 ## Testing
 

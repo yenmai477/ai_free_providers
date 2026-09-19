@@ -13,6 +13,17 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_TEMPLATE_DIR = REPO_ROOT / "gateway" / "templates"
 
 
+def _alias_rows(model_id: str) -> list[tuple[str, str | None]]:
+    return [
+        (model_id, model_id),
+        (f"{model_id}-claude", f"{model_id} (gateway)"),
+        ("claude-sonnet-4-20250514", None),
+        ("claude-sonnet-4-5-20250929", None),
+        ("claude-haiku-4-5-20251001", None),
+        ("claude-opus-4-20250514", None),
+    ]
+
+
 def render_litellm_yaml(
     model_id: str,
     model: ModelConfig,
@@ -26,10 +37,14 @@ def render_litellm_yaml(
         keep_trailing_newline=True,
     )
     template = env.get_template("litellm.yaml.j2")
+    disable_think = model.family in {"qwen"}
     return template.render(
         model_id=model_id,
         ollama_model=model.model,
         api_base=settings.ollama_api_base,
+        family=model.family,
+        disable_think=disable_think,
+        aliases=_alias_rows(model_id),
     )
 
 
@@ -54,24 +69,23 @@ def litellm_config_dict(
     model_id: str, model: ModelConfig, settings: Settings
 ) -> dict:
     """Programmatic equivalent used by tests / runtime without Jinja."""
-    params = {
+    params: dict = {
         "model": f"ollama_chat/{model.model}",
         "api_base": "http://127.0.0.1:11434",
         "api_key": "ollama",
-        "think": False,
     }
+    if model.family in {"qwen"}:
+        params["think"] = False
+
+    def _entry(name: str, display: str | None = None) -> dict:
+        item: dict = {"model_name": name, "litellm_params": dict(params)}
+        if display is not None:
+            item["model_info"] = {"display_name": display}
+        return item
+
     return {
         "model_list": [
-            {
-                "model_name": model_id,
-                "litellm_params": dict(params),
-                "model_info": {"display_name": model_id},
-            },
-            {
-                "model_name": f"{model_id}-claude",
-                "litellm_params": dict(params),
-                "model_info": {"display_name": f"{model_id} (gateway)"},
-            },
+            _entry(name, display) for name, display in _alias_rows(model_id)
         ],
         "general_settings": {
             "master_key": "os.environ/LITELLM_MASTER_KEY",
