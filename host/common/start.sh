@@ -5,6 +5,11 @@ set -euo pipefail
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 export PATH="$BIN_DIR:/usr/local/bin:$PATH"
 
+# Colab: prefer system NVIDIA libraries
+if [[ -d /usr/lib64-nvidia ]]; then
+  export LD_LIBRARY_PATH="/usr/lib64-nvidia${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
 OLLAMA_LOG="${OLLAMA_LOG:-/tmp/ollama.log}"
 LITELLM_LOG="${LITELLM_LOG:-/tmp/litellm.log}"
 LITELLM_CONFIG="${LITELLM_CONFIG:-/tmp/litellm.yaml}"

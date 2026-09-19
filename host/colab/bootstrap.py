@@ -78,42 +78,87 @@ def install_ollama() -> None:
         print(f"[bootstrap] ollama already present: {_which('ollama')}")
         return
 
+    # Colab: prefer system NVIDIA libs over bundled ones
+    ld = os.environ.get("LD_LIBRARY_PATH", "")
+    nvidia = "/usr/lib64-nvidia"
+    if Path(nvidia).is_dir() and nvidia not in ld.split(":"):
+        os.environ["LD_LIBRARY_PATH"] = f"{nvidia}:{ld}" if ld else nvidia
+        print(f"[bootstrap] LD_LIBRARY_PATH={os.environ['LD_LIBRARY_PATH']}")
+
     print("[bootstrap] Installing Ollama via official install.sh…")
-    # Do not use pipefail semantics that abort on installer warnings.
     script = "curl -fsSL https://ollama.com/install.sh | sh"
-    rc = subprocess.run(["bash", "-c", script]).returncode
-    if rc == 0 and _which("ollama"):
-        print(f"[bootstrap] ollama installed: {_which('ollama')}")
+    result = subprocess.run(["bash", "-c", script], text=True)
+    # install.sh may exit non-zero (no systemd) but still place the binary
+    if _which("ollama"):
+        print(f"[bootstrap] ollama installed: {_which('ollama')} (rc={result.returncode})")
         return
 
-    print("[bootstrap] Official installer failed; trying direct binary…")
-    bin_dir = _bin_dir()
-    # Stable-ish release asset name used by Ollama Linux packages
-    tgz = Path("/tmp/ollama-linux.tgz")
-    url = "https://ollama.com/download/ollama-linux-amd64.tgz"
-    try:
-        _download(url, tgz)
-    except Exception as exc:  # noqa: BLE001
-        raise RuntimeError(
-            "Failed to install Ollama (install.sh and direct download both failed). "
-            f"Last error: {exc}"
-        ) from exc
+    print(
+        f"[bootstrap] Official installer did not produce ollama (rc={result.returncode}); "
+        "trying manual tar.zst…"
+    )
+    _install_ollama_from_tarball()
 
-    extract_dir = Path("/tmp/ollama-extract")
-    if extract_dir.exists():
-        shutil.rmtree(extract_dir)
-    extract_dir.mkdir(parents=True)
-    _run(["tar", "-xzf", str(tgz), "-C", str(extract_dir)])
-    # Binary may be at extract_dir/bin/ollama or extract_dir/ollama
-    candidates = list(extract_dir.rglob("ollama"))
-    binary = next((c for c in candidates if c.is_file()), None)
-    if binary is None:
-        raise RuntimeError("ollama binary not found inside downloaded archive")
-    dest = bin_dir / "ollama"
-    shutil.copy2(binary, dest)
-    dest.chmod(dest.stat().st_mode | 0o111)
+
+def _install_ollama_from_tarball() -> None:
+    """Manual install: https://docs.ollama.com/linux (amd64 tar.zst)."""
+    machine = platform.machine().lower()
+    if machine in {"x86_64", "amd64"}:
+        asset = "ollama-linux-amd64.tar.zst"
+    elif machine in {"aarch64", "arm64"}:
+        asset = "ollama-linux-arm64.tar.zst"
+    else:
+        raise RuntimeError(f"Unsupported arch for Ollama: {machine}")
+
+    url = f"https://ollama.com/download/{asset}"
+    archive = Path("/tmp") / asset
+    _download(url, archive)
+
+    # Prefer /usr (Colab is usually root); else $HOME/.local
+    if os.access("/usr", os.W_OK) or os.geteuid() == 0:
+        prefix = Path("/usr")
+    else:
+        prefix = Path.home() / ".local"
+        prefix.mkdir(parents=True, exist_ok=True)
+        _bin_dir()
+
+    print(f"[bootstrap] Extracting {archive.name} → {prefix}")
+    # GNU tar with zstd; fall back to zstd|tar if needed
+    rc = subprocess.run(
+        ["tar", "-x", "--zstd", "-f", str(archive), "-C", str(prefix)]
+    ).returncode
+    if rc != 0:
+        rc = subprocess.run(
+            ["bash", "-c", f"zstd -d -c {archive} | tar -x -C {prefix}"]
+        ).returncode
+    if rc != 0:
+        # last resort: tar auto-detect
+        rc = subprocess.run(
+            ["tar", "-xf", str(archive), "-C", str(prefix)]
+        ).returncode
+    if rc != 0:
+        raise RuntimeError(
+            f"Failed to extract {archive}. Install zstd (`apt-get install -y zstd`) and retry."
+        )
+
+    # Ensure PATH sees prefix/bin
+    bin_path = prefix / "bin"
+    if bin_path.is_dir():
+        os.environ["PATH"] = f"{bin_path}:{os.environ.get('PATH', '')}"
+
     if not _which("ollama"):
-        raise RuntimeError("ollama still not on PATH after manual install")
+        # Some layouts put binary at prefix/bin/ollama after extract
+        candidate = prefix / "bin" / "ollama"
+        if candidate.is_file():
+            dest = _bin_dir() / "ollama"
+            shutil.copy2(candidate, dest)
+            dest.chmod(dest.stat().st_mode | 0o111)
+
+    if not _which("ollama"):
+        raise RuntimeError(
+            "ollama not on PATH after tar.zst install. "
+            f"Checked PATH={os.environ.get('PATH')}"
+        )
     print(f"[bootstrap] ollama installed: {_which('ollama')}")
 
 

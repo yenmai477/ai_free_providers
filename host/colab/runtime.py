@@ -104,6 +104,11 @@ def run(
     bin_dir = str(Path.home() / ".local" / "bin")
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}:/usr/local/bin:{env.get('PATH', '')}"
+    # Colab GPU: Ollama needs system NVIDIA libs
+    nvidia = "/usr/lib64-nvidia"
+    if Path(nvidia).is_dir():
+        ld = env.get("LD_LIBRARY_PATH", "")
+        env["LD_LIBRARY_PATH"] = f"{nvidia}:{ld}" if ld else nvidia
     env.update(
         {
             "OLLAMA_MODEL": model.model,
