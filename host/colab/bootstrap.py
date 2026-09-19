@@ -100,6 +100,31 @@ def install_ollama() -> None:
     _install_ollama_from_tarball()
 
 
+def _ensure_zstd() -> None:
+    """Install zstd on Debian/Colab if missing (needed for Ollama tar.zst)."""
+    if _which("zstd"):
+        print(f"[bootstrap] zstd present: {_which('zstd')}")
+        return
+    print("[bootstrap] Installing zstd via apt-get…")
+    cmds = [
+        ["apt-get", "update", "-qq"],
+        ["apt-get", "install", "-y", "-qq", "zstd"],
+    ]
+    # Prefer sudo when not root
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        cmds = [["sudo", *c] for c in cmds]
+    for cmd in cmds:
+        rc = subprocess.run(cmd).returncode
+        if rc != 0:
+            raise RuntimeError(
+                f"Failed to install zstd ({' '.join(cmd)} exit {rc}). "
+                "Run manually: apt-get install -y zstd"
+            )
+    if not _which("zstd"):
+        raise RuntimeError("zstd still not on PATH after apt-get install")
+    print(f"[bootstrap] zstd installed: {_which('zstd')}")
+
+
 def _install_ollama_from_tarball() -> None:
     """Manual install: https://docs.ollama.com/linux (amd64 tar.zst)."""
     machine = platform.machine().lower()
@@ -110,35 +135,35 @@ def _install_ollama_from_tarball() -> None:
     else:
         raise RuntimeError(f"Unsupported arch for Ollama: {machine}")
 
+    _ensure_zstd()
+
     url = f"https://ollama.com/download/{asset}"
     archive = Path("/tmp") / asset
     _download(url, archive)
+    if not archive.is_file() or archive.stat().st_size < 1_000_000:
+        raise RuntimeError(f"Downloaded archive looks invalid: {archive}")
 
     # Prefer /usr (Colab is usually root); else $HOME/.local
-    if os.access("/usr", os.W_OK) or os.geteuid() == 0:
+    if os.access("/usr", os.W_OK) or (hasattr(os, "geteuid") and os.geteuid() == 0):
         prefix = Path("/usr")
     else:
         prefix = Path.home() / ".local"
         prefix.mkdir(parents=True, exist_ok=True)
         _bin_dir()
 
-    print(f"[bootstrap] Extracting {archive.name} → {prefix}")
-    # GNU tar with zstd; fall back to zstd|tar if needed
-    rc = subprocess.run(
-        ["tar", "-x", "--zstd", "-f", str(archive), "-C", str(prefix)]
-    ).returncode
+    print(f"[bootstrap] Extracting {archive.name} ({archive.stat().st_size} bytes) → {prefix}")
+    # Decompress then untar (most reliable on Colab)
+    extract_cmd = f"zstd -d -c '{archive}' | tar -x -C '{prefix}'"
+    rc = subprocess.run(["bash", "-c", extract_cmd]).returncode
     if rc != 0:
         rc = subprocess.run(
-            ["bash", "-c", f"zstd -d -c {archive} | tar -x -C {prefix}"]
-        ).returncode
-    if rc != 0:
-        # last resort: tar auto-detect
-        rc = subprocess.run(
-            ["tar", "-xf", str(archive), "-C", str(prefix)]
+            ["tar", "-x", "--zstd", "-f", str(archive), "-C", str(prefix)]
         ).returncode
     if rc != 0:
         raise RuntimeError(
-            f"Failed to extract {archive}. Install zstd (`apt-get install -y zstd`) and retry."
+            f"Failed to extract {archive} (rc={rc}). "
+            "Try: apt-get install -y zstd && "
+            f"zstd -d -c {archive} | tar -x -C {prefix}"
         )
 
     # Ensure PATH sees prefix/bin
@@ -147,7 +172,6 @@ def _install_ollama_from_tarball() -> None:
         os.environ["PATH"] = f"{bin_path}:{os.environ.get('PATH', '')}"
 
     if not _which("ollama"):
-        # Some layouts put binary at prefix/bin/ollama after extract
         candidate = prefix / "bin" / "ollama"
         if candidate.is_file():
             dest = _bin_dir() / "ollama"
