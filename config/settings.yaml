@@ -1,0 +1,21 @@
+version: 1
+
+ports:
+  ollama: 11434
+  litellm: 4000
+
+gateway:
+  api_key_env: GATEWAY_API_KEY
+  ollama_api_base: http://127.0.0.1:11434/v1
+
+gpu_profiles:
+  t4-16gb:
+    vram_gb: 15
+    reserved_vram_gb: 2
+    usable_vram_gb: 13
+
+paths:
+  ollama_log: /tmp/ollama.log
+  litellm_log: /tmp/litellm.log
+  cloudflared_log: /tmp/cloudflared.log
+  litellm_config: /tmp/litellm.yaml

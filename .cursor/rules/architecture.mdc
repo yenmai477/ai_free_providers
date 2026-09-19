@@ -1,0 +1,26 @@
+---
+description: Architecture rules for model gateway
+alwaysApply: true
+---
+
+The system consists of:
+
+1. Client
+2. Cloudflare Tunnel
+3. LiteLLM
+4. Ollama
+5. Exactly one model
+
+Never introduce a central gateway server
+unless explicitly requested.
+
+Never make model selection and host selection
+the same abstraction.
+
+Models belong to models.yaml.
+
+Hosts belong to hosts.yaml.
+
+Never hard-code a Cloudflare URL.
+Never put API keys into git.
+Never run multiple models simultaneously.

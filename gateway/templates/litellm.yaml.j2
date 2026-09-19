@@ -1,0 +1,9 @@
+model_list:
+  - model_name: {{ model_id }}
+    litellm_params:
+      model: openai/{{ ollama_model }}
+      api_base: {{ api_base }}
+      api_key: ollama
+
+general_settings:
+  master_key: os.environ/GATEWAY_API_KEY

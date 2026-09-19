@@ -1,0 +1,10 @@
+---
+description: Python conventions for free-model-gateway
+globs: "**/*.py"
+alwaysApply: false
+---
+
+- Prefer stdlib + pyyaml/jinja2/requests for core library code.
+- Keep registry logic pure and unit-testable (inject nvidia-smi output).
+- Raise clear RuntimeError / ValueError with actionable messages.
+- Do not add databases, Redis, or always-on services in MVP.

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "free-model-gateway"
+version = "0.1.0"
+description = "Zero-cost model gateway: Colab/HF → LiteLLM → Ollama for coding clients"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "jinja2>=3.1",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+colab = [
+    "litellm[proxy]>=1.40",
+]
+
+[project.scripts]
+modelctl = "modelctl.main:main"
+
+[tool.setuptools.packages.find]
+where = ["cli"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["cli"]

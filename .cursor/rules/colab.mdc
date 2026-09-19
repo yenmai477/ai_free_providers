@@ -1,0 +1,11 @@
+---
+description: Colab host bootstrap rules
+globs: "host/colab/**"
+alwaysApply: false
+---
+
+- Notebook selects exactly one model before startup.
+- Pull and load only the selected Ollama model.
+- Generate LiteLLM config for that single model.
+- Print READY only after end-to-end public health checks pass.
+- Never commit trycloudflare URLs or GATEWAY_API_KEY values.
