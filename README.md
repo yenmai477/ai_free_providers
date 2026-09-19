@@ -29,6 +29,29 @@ curl -sS -H "Authorization: Bearer $GATEWAY_API_KEY" \
   "$URL/v1/chat/completions"
 ```
 
+### modelctl (local)
+
+```bash
+pip install -e ".[dev]"
+
+modelctl models
+modelctl hosts
+modelctl use colab-t4-01 qwen3-8b
+modelctl connect https://xxxxx.trycloudflare.com   # from READY banner
+# prints:
+#   export ANTHROPIC_BASE_URL=...
+#   export ANTHROPIC_API_KEY=...   # if GATEWAY_API_KEY is set in your shell
+
+export GATEWAY_API_KEY="..."   # same key Colab printed
+modelctl status                # probes /v1/models
+modelctl endpoint env          # re-print exports
+modelctl stop                  # clear endpoint from ~/.modelctl/state.json
+```
+
+State lives in `~/.modelctl/state.json` (override with `MODELCTL_HOME`).
+
+**Qwen3 empty content:** LiteLLM config uses `ollama_chat/` + `think: false` so replies land in `message.content` (re-run Colab after `git pull`).
+
 Optional client env (Anthropic-compatible adapters):
 
 ```bash
@@ -52,7 +75,7 @@ pytest
 | `config/models.yaml` | Model registry |
 | `config/hosts.yaml` | Host registry |
 | `config/settings.yaml` | Ports, VRAM profiles |
-| `cli/modelctl/` | Shared services (+ CLI stub) |
+| `cli/modelctl/` | CLI + shared services |
 | `host/colab/` | Notebook + runtime |
 | `host/common/` | Install/start/stop/tunnel scripts |
 | `gateway/templates/` | LiteLLM Jinja template |

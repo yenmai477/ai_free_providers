@@ -59,9 +59,10 @@ def litellm_config_dict(
             {
                 "model_name": model_id,
                 "litellm_params": {
-                    "model": f"ollama/{model.model}",
+                    "model": f"ollama_chat/{model.model}",
                     "api_base": "http://127.0.0.1:11434",
                     "api_key": "ollama",
+                    "think": False,
                 },
             }
         ],

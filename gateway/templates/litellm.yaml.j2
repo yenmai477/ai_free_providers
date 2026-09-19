@@ -1,9 +1,12 @@
 model_list:
   - model_name: {{ model_id }}
     litellm_params:
-      model: ollama/{{ ollama_model }}
+      # ollama_chat uses /api/chat (better than ollama/ generate).
+      # think:false avoids Qwen3 empty content (thinking eats the reply).
+      model: ollama_chat/{{ ollama_model }}
       api_base: http://127.0.0.1:11434
       api_key: ollama
+      think: false
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
