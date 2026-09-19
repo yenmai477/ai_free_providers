@@ -59,6 +59,23 @@ def build_parser() -> argparse.ArgumentParser:
     conn = sub.add_parser("connect", help="Set endpoint and print exports (alias)")
     conn.add_argument("url")
 
+    claude = sub.add_parser(
+        "claude",
+        help="Configure Claude Code for the current gateway endpoint",
+    )
+    claude_sub = claude.add_subparsers(dest="claude_cmd", required=True)
+    claude_sub.add_parser("env", help="Print env exports for Claude Code")
+    claude_setup = claude_sub.add_parser(
+        "setup",
+        help="Write/merge ~/.claude/settings.json env block",
+    )
+    claude_setup.add_argument(
+        "--settings",
+        type=Path,
+        default=None,
+        help="Override settings.json path",
+    )
+
     return p
 
 
@@ -115,6 +132,14 @@ def main(argv: list[str] | None = None) -> int:
         from modelctl.commands.endpoint import cmd_connect
 
         return cmd_connect(args.url)
+
+    if args.command == "claude":
+        from modelctl.commands.claude_cmd import cmd_claude_env, cmd_claude_setup
+
+        if args.claude_cmd == "env":
+            return cmd_claude_env()
+        if args.claude_cmd == "setup":
+            return cmd_claude_setup(settings_path=args.settings)
 
     parser.error(f"unknown command {args.command}")
     return 2

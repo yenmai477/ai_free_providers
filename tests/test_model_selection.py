@@ -30,7 +30,10 @@ def test_litellm_config_dict_single_entry():
     reg = load_registry(CONFIG_DIR)
     model = reg.models["qwen3-8b"]
     cfg = litellm_config_dict("qwen3-8b", model, reg.settings)
-    assert len(cfg["model_list"]) == 1
+    assert len(cfg["model_list"]) >= 2
     params = cfg["model_list"][0]["litellm_params"]
     assert params["model"] == "ollama_chat/qwen3:8b"
     assert params["think"] is False
+    names = {m["model_name"] for m in cfg["model_list"]}
+    assert "qwen3-8b" in names
+    assert "qwen3-8b-claude" in names

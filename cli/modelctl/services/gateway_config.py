@@ -54,17 +54,24 @@ def litellm_config_dict(
     model_id: str, model: ModelConfig, settings: Settings
 ) -> dict:
     """Programmatic equivalent used by tests / runtime without Jinja."""
+    params = {
+        "model": f"ollama_chat/{model.model}",
+        "api_base": "http://127.0.0.1:11434",
+        "api_key": "ollama",
+        "think": False,
+    }
     return {
         "model_list": [
             {
                 "model_name": model_id,
-                "litellm_params": {
-                    "model": f"ollama_chat/{model.model}",
-                    "api_base": "http://127.0.0.1:11434",
-                    "api_key": "ollama",
-                    "think": False,
-                },
-            }
+                "litellm_params": dict(params),
+                "model_info": {"display_name": model_id},
+            },
+            {
+                "model_name": f"{model_id}-claude",
+                "litellm_params": dict(params),
+                "model_info": {"display_name": f"{model_id} (gateway)"},
+            },
         ],
         "general_settings": {
             "master_key": "os.environ/LITELLM_MASTER_KEY",
@@ -75,6 +82,10 @@ def litellm_config_dict(
 def assert_single_model_config(yaml_text: str) -> str:
     data = yaml.safe_load(yaml_text)
     models = data.get("model_list") or []
-    if len(models) != 1:
-        raise ValueError(f"Expected exactly one model in LiteLLM config, got {len(models)}")
+    if len(models) < 1:
+        raise ValueError("Expected at least one model in LiteLLM config")
+    # All entries must share the same Ollama backend
+    backends = {m["litellm_params"]["model"] for m in models}
+    if len(backends) != 1:
+        raise ValueError(f"Expected one Ollama backend, got {backends}")
     return models[0]["model_name"]

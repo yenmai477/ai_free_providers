@@ -61,6 +61,38 @@ export ANTHROPIC_API_KEY="$GATEWAY_API_KEY"
 
 Copy `.env.example` → `.env` locally; **never commit real keys or trycloudflare URLs**.
 
+### Claude Code (custom gateway)
+
+Claude Code talks **Anthropic Messages API** (`/v1/messages`) via LiteLLM. After Colab is READY:
+
+```powershell
+$env:GATEWAY_API_KEY = "<key from Colab>"
+modelctl connect https://xxxxx.trycloudflare.com
+modelctl claude setup    # writes %USERPROFILE%\.claude\settings.json
+```
+
+Then restart the terminal and run:
+
+```powershell
+claude
+# or pin model:
+claude --model qwen3-8b-claude
+```
+
+Inside Claude Code: `/model` → pick gateway model (`*-claude` / From gateway).
+
+Verify Messages API:
+
+```powershell
+curl.exe -sS "$env:ANTHROPIC_BASE_URL/v1/messages" `
+  -H "Authorization: Bearer $env:GATEWAY_API_KEY" `
+  -H "Content-Type: application/json" `
+  -H "anthropic-version: 2023-06-01" `
+  -d "{\"model\":\"qwen3-8b-claude\",\"max_tokens\":64,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}"
+```
+
+**Re-run Colab after `git pull`** so LiteLLM regenerates aliases (`qwen3-8b-claude` + default Claude model ids → same Ollama backend).
+
 ## Local development
 
 ```bash

@@ -1,8 +1,45 @@
 model_list:
+  # Primary id (OpenAI-style clients + modelctl)
   - model_name: {{ model_id }}
     litellm_params:
-      # ollama_chat uses /api/chat (better than ollama/ generate).
-      # think:false avoids Qwen3 empty content (thinking eats the reply).
+      model: ollama_chat/{{ ollama_model }}
+      api_base: http://127.0.0.1:11434
+      api_key: ollama
+      think: false
+    model_info:
+      display_name: "{{ model_id }}"
+
+  # Claude Code /model picker keeps ids that contain "claude"
+  - model_name: {{ model_id }}-claude
+    litellm_params:
+      model: ollama_chat/{{ ollama_model }}
+      api_base: http://127.0.0.1:11434
+      api_key: ollama
+      think: false
+    model_info:
+      display_name: "{{ model_id }} (gateway)"
+
+  # Common Claude Code default model ids → same Ollama backend
+  - model_name: claude-sonnet-4-20250514
+    litellm_params:
+      model: ollama_chat/{{ ollama_model }}
+      api_base: http://127.0.0.1:11434
+      api_key: ollama
+      think: false
+  - model_name: claude-sonnet-4-5-20250929
+    litellm_params:
+      model: ollama_chat/{{ ollama_model }}
+      api_base: http://127.0.0.1:11434
+      api_key: ollama
+      think: false
+  - model_name: claude-haiku-4-5-20251001
+    litellm_params:
+      model: ollama_chat/{{ ollama_model }}
+      api_base: http://127.0.0.1:11434
+      api_key: ollama
+      think: false
+  - model_name: claude-opus-4-20250514
+    litellm_params:
       model: ollama_chat/{{ ollama_model }}
       api_base: http://127.0.0.1:11434
       api_key: ollama
