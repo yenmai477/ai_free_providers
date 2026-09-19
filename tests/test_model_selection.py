@@ -21,7 +21,7 @@ def test_phase1_qwen_selection_renders_single_model():
     yaml_text = render_litellm_yaml("qwen3-8b", model, reg.settings)
     name = assert_single_model_config(yaml_text)
     assert name == "qwen3-8b"
-    assert "openai/qwen3:8b" in yaml_text
+    assert "ollama/qwen3:8b" in yaml_text
     assert "11434" in yaml_text
 
 
@@ -30,4 +30,4 @@ def test_litellm_config_dict_single_entry():
     model = reg.models["qwen3-8b"]
     cfg = litellm_config_dict("qwen3-8b", model, reg.settings)
     assert len(cfg["model_list"]) == 1
-    assert cfg["model_list"][0]["litellm_params"]["model"] == "openai/qwen3:8b"
+    assert cfg["model_list"][0]["litellm_params"]["model"] == "ollama/qwen3:8b"

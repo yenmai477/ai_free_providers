@@ -122,6 +122,7 @@ def run(
             "OLLAMA_NUM_CTX": str(context),
             "PYTHON_BIN": sys.executable,
             "BIN_DIR": bin_dir,
+            "LITELLM_MASTER_KEY": api_key,
         }
     )
 
@@ -145,9 +146,19 @@ def run(
     print("[runtime] waiting for model…")
     wait_for_model(model.model)
     print("[runtime] waiting for LiteLLM…")
-    wait_for_gateway(
-        base=f"http://127.0.0.1:{settings.litellm_port}", api_key=api_key
-    )
+    try:
+        wait_for_gateway(
+            base=f"http://127.0.0.1:{settings.litellm_port}", api_key=api_key
+        )
+    except TimeoutError:
+        log_path = Path(litellm_log)
+        print("[runtime] LiteLLM failed to become ready. Last log lines:")
+        if log_path.exists():
+            print(log_path.read_text(encoding="utf-8", errors="replace")[-4000:])
+        else:
+            print(f"(no log at {log_path})")
+        raise
+
 
     _run_script(common / "tunnel.sh", check=True)
     print("[runtime] waiting for Cloudflare URL…")

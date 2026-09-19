@@ -18,6 +18,9 @@ OLLAMA_MODEL="${OLLAMA_MODEL:?OLLAMA_MODEL required}"
 GATEWAY_API_KEY="${GATEWAY_API_KEY:?GATEWAY_API_KEY required}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
+export GATEWAY_API_KEY
+export LITELLM_MASTER_KEY="${GATEWAY_API_KEY}"
+
 if ! pgrep -f "ollama serve" >/dev/null 2>&1; then
   echo "[start] ollama serve"
   nohup ollama serve >"$OLLAMA_LOG" 2>&1 &
@@ -27,15 +30,66 @@ fi
 echo "[start] pull $OLLAMA_MODEL"
 ollama pull "$OLLAMA_MODEL"
 
+echo "[start] litellm config:"
+sed -n '1,40p' "$LITELLM_CONFIG" || true
+
+# Kill any previous litellm on this port
+pkill -f "litellm" 2>/dev/null || true
+sleep 1
+: >"$LITELLM_LOG"
+
 echo "[start] litellm on :$LITELLM_PORT"
-export GATEWAY_API_KEY
-# Prefer module entry (works even when scripts/ not on PATH in Colab).
-if "$PYTHON_BIN" -c "import litellm" >/dev/null 2>&1; then
-  nohup "$PYTHON_BIN" -m litellm --config "$LITELLM_CONFIG" --port "$LITELLM_PORT" \
-    >"$LITELLM_LOG" 2>&1 &
+
+# Resolve litellm CLI (python -m litellm often does NOT start the proxy)
+LITELLM_BIN=""
+if command -v litellm >/dev/null 2>&1; then
+  LITELLM_BIN="$(command -v litellm)"
 else
-  nohup litellm --config "$LITELLM_CONFIG" --port "$LITELLM_PORT" \
-    >"$LITELLM_LOG" 2>&1 &
+  SCRIPTS="$("$PYTHON_BIN" -c 'import sysconfig; print(sysconfig.get_path("scripts"))')"
+  if [[ -x "$SCRIPTS/litellm" ]]; then
+    LITELLM_BIN="$SCRIPTS/litellm"
+  fi
 fi
 
-echo "[start] backend processes launched"
+if [[ -n "$LITELLM_BIN" ]]; then
+  echo "[start] using CLI: $LITELLM_BIN"
+  nohup "$LITELLM_BIN" --config "$LITELLM_CONFIG" --port "$LITELLM_PORT" --host "0.0.0.0" \
+    >"$LITELLM_LOG" 2>&1 &
+else
+  echo "[start] using proxy_cli via $PYTHON_BIN"
+  nohup "$PYTHON_BIN" -c "
+from litellm.proxy.proxy_cli import run_server
+import sys
+sys.argv = [
+    'litellm',
+    '--config', r'''${LITELLM_CONFIG}''',
+    '--port', '${LITELLM_PORT}',
+    '--host', '0.0.0.0',
+]
+run_server()
+" >"$LITELLM_LOG" 2>&1 &
+fi
+
+LITELLM_PID=$!
+echo "[start] litellm pid=$LITELLM_PID"
+
+# Wait briefly and verify something is listening
+for i in $(seq 1 30); do
+  if curl -fsS "http://127.0.0.1:${LITELLM_PORT}/health" >/dev/null 2>&1 \
+     || curl -fsS -H "Authorization: Bearer ${GATEWAY_API_KEY}" \
+          "http://127.0.0.1:${LITELLM_PORT}/v1/models" >/dev/null 2>&1; then
+    echo "[start] litellm is up"
+    exit 0
+  fi
+  # process died?
+  if ! kill -0 "$LITELLM_PID" 2>/dev/null; then
+    echo "[start] ERROR: litellm exited early. Log:" >&2
+    tail -n 80 "$LITELLM_LOG" >&2 || true
+    exit 1
+  fi
+  sleep 1
+done
+
+echo "[start] ERROR: litellm did not become ready in 30s. Log:" >&2
+tail -n 80 "$LITELLM_LOG" >&2 || true
+exit 1

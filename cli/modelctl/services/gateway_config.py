@@ -59,14 +59,14 @@ def litellm_config_dict(
             {
                 "model_name": model_id,
                 "litellm_params": {
-                    "model": f"openai/{model.model}",
-                    "api_base": settings.ollama_api_base,
+                    "model": f"ollama/{model.model}",
+                    "api_base": "http://127.0.0.1:11434",
                     "api_key": "ollama",
                 },
             }
         ],
         "general_settings": {
-            "master_key": "os.environ/GATEWAY_API_KEY",
+            "master_key": "os.environ/LITELLM_MASTER_KEY",
         },
     }
 
