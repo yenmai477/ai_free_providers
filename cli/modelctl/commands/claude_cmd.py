@@ -42,7 +42,7 @@ def cmd_claude_setup(*, settings_path: Path | None = None) -> int:
         f'  curl -sS "{ep}/v1/messages" -H "Authorization: Bearer $env:GATEWAY_API_KEY" '
         '-H "Content-Type: application/json" '
         '-H "anthropic-version: 2023-06-01" '
-        '-d "{{\\"model\\":\\"qwen3-8b-claude\\",\\"max_tokens\\":64,'
+        '-d "{{\\"model\\":\\"qwen3-8b\\",\\"max_tokens\\":64,'
         '\\"messages\\":[{{\\"role\\":\\"user\\",\\"content\\":\\"hi\\"}}]}}"'
     )
     print()

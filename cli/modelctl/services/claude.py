@@ -33,17 +33,18 @@ def claude_env_dict(
             f"Set {state.api_key_env} (or ANTHROPIC_AUTH_TOKEN) in your environment"
         )
     model = state.model or "qwen3-8b"
+    # Prefer plain registry id (always on /v1/models). *-claude aliases need Colab rebuild.
     return {
         "ANTHROPIC_BASE_URL": state.endpoint.rstrip("/"),
         "ANTHROPIC_AUTH_TOKEN": key,
         "ANTHROPIC_API_KEY": key,
         state.api_key_env: key,
         "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY": "1",
-        # Prefer gateway model id; aliases also exist for default Claude names
-        "ANTHROPIC_MODEL": f"{model}-claude",
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": f"{model}-claude",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": f"{model}-claude",
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": f"{model}-claude",
+        "ANTHROPIC_MODEL": model,
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": model,
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": model,
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": model,
+        "CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT": "1",
     }
 
 
