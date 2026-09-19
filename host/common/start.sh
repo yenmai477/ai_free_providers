@@ -25,9 +25,17 @@ export CONFIG_FILE_PATH="${LITELLM_CONFIG}"
 
 dump_logs() {
   echo "======== /tmp litellm.log (tail) ========" >&2
-  tail -n 100 "$LITELLM_LOG" 2>/dev/null >&2 || echo "(no litellm log)" >&2
+  if [[ -f "$LITELLM_LOG" ]]; then
+    tail -n 100 "$LITELLM_LOG" >&2
+  else
+    echo "(no litellm log)" >&2
+  fi
   echo "======== /tmp ollama.log (tail) ========" >&2
-  tail -n 40 "$OLLAMA_LOG" 2>/dev/null >&2 || echo "(no ollama log)" >&2
+  if [[ -f "$OLLAMA_LOG" ]]; then
+    tail -n 40 "$OLLAMA_LOG" >&2
+  else
+    echo "(no ollama log)" >&2
+  fi
 }
 
 echo "[start] PATH=$PATH"
@@ -76,12 +84,10 @@ echo "[start] litellm config:"
 sed -n '1,40p' "$LITELLM_CONFIG" || true
 
 pkill -f "[l]itellm" 2>/dev/null || true
-# also free the port if something else holds it
 fuser -k "${LITELLM_PORT}/tcp" 2>/dev/null || true
 sleep 1
 : >"$LITELLM_LOG"
 
-# Ensure proxy extras present
 "$PYTHON_BIN" -c "import uvicorn, fastapi, litellm" 2>/dev/null || {
   echo "[start] installing litellm proxy deps…"
   "$PYTHON_BIN" -m pip install -q --break-system-packages 'litellm[proxy]' uvicorn fastapi || \
@@ -90,9 +96,10 @@ sleep 1
 
 echo "[start] litellm on :$LITELLM_PORT"
 
-start_litellm() {
+# IMPORTANT: only the PID may go to stdout from this function; logs → stderr
+launch_litellm() {
   local mode="$1"
-  echo "[start] launch mode: $mode"
+  echo "[start] launch mode: $mode" >&2
   case "$mode" in
     cli)
       local bin
@@ -100,11 +107,15 @@ start_litellm() {
       if [[ -z "$bin" && -x "${SCRIPTS_DIR}/litellm" ]]; then
         bin="${SCRIPTS_DIR}/litellm"
       fi
-      [[ -n "$bin" ]] || return 1
-      echo "[start] CLI=$bin"
+      if [[ -z "$bin" ]]; then
+        echo "[start] litellm CLI not found" >&2
+        return 1
+      fi
+      echo "[start] CLI=$bin" >&2
       nohup "$bin" --config "$LITELLM_CONFIG" --port "$LITELLM_PORT" --host "0.0.0.0" \
         >"$LITELLM_LOG" 2>&1 &
       echo $!
+      return 0
       ;;
     proxy_cli)
       nohup "$PYTHON_BIN" -c "
@@ -114,17 +125,18 @@ sys.argv = ['litellm', '--config', r'''${LITELLM_CONFIG}''', '--port', '${LITELL
 run_server()
 " >"$LITELLM_LOG" 2>&1 &
       echo $!
+      return 0
       ;;
     uvicorn)
       nohup "$PYTHON_BIN" -c "
 import os, uvicorn
 os.environ['LITELLM_MASTER_KEY'] = os.environ.get('LITELLM_MASTER_KEY', '')
 os.environ['CONFIG_FILE_PATH'] = r'''${LITELLM_CONFIG}'''
-# Import after env so proxy picks up config path when supported
 from litellm.proxy.proxy_server import app
 uvicorn.run(app, host='0.0.0.0', port=int('${LITELLM_PORT}'))
 " >"$LITELLM_LOG" 2>&1 &
       echo $!
+      return 0
       ;;
     *)
       return 1
@@ -132,12 +144,15 @@ uvicorn.run(app, host='0.0.0.0', port=int('${LITELLM_PORT}'))
   esac
 }
 
-LITELLM_PID=""
 for mode in cli proxy_cli uvicorn; do
   : >"$LITELLM_LOG"
-  LITELLM_PID="$(start_litellm "$mode" || true)"
-  if [[ -z "$LITELLM_PID" ]]; then
+  if ! LITELLM_PID="$(launch_litellm "$mode")"; then
     echo "[start] mode $mode unavailable"
+    continue
+  fi
+  # sanitize: PID must be digits only
+  if ! [[ "$LITELLM_PID" =~ ^[0-9]+$ ]]; then
+    echo "[start] ERROR: bad pid capture for mode=$mode: '$LITELLM_PID'" >&2
     continue
   fi
   echo "[start] litellm pid=$LITELLM_PID (mode=$mode)"
@@ -154,7 +169,7 @@ for mode in cli proxy_cli uvicorn; do
     fi
     if ! kill -0 "$LITELLM_PID" 2>/dev/null; then
       echo "[start] mode $mode exited early"
-      tail -n 40 "$LITELLM_LOG" || true
+      tail -n 60 "$LITELLM_LOG" || true
       break
     fi
     sleep 1
