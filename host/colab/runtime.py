@@ -102,8 +102,16 @@ def run(
     write_litellm_config(litellm_config, model_id, model, settings)
 
     bin_dir = str(Path.home() / ".local" / "bin")
+    try:
+        import sysconfig
+
+        scripts_dir = sysconfig.get_path("scripts") or ""
+    except Exception:  # noqa: BLE001
+        scripts_dir = ""
     env = os.environ.copy()
-    env["PATH"] = f"{bin_dir}:/usr/local/bin:{env.get('PATH', '')}"
+    env["PATH"] = ":".join(
+        p for p in [bin_dir, scripts_dir, "/usr/local/bin", env.get("PATH", "")] if p
+    )
     # Colab GPU: Ollama needs system NVIDIA libs
     nvidia = "/usr/lib64-nvidia"
     if Path(nvidia).is_dir():
@@ -123,18 +131,32 @@ def run(
             "PYTHON_BIN": sys.executable,
             "BIN_DIR": bin_dir,
             "LITELLM_MASTER_KEY": api_key,
+            "CONFIG_FILE_PATH": str(litellm_config),
         }
     )
 
     common = root / "host" / "common"
 
+    def _dump_host_logs() -> None:
+        for label, path in (
+            ("litellm", litellm_log),
+            ("ollama", ollama_log),
+            ("cloudflared", cloudflared_log),
+        ):
+            p = Path(path)
+            print(f"======== {label} log: {p} ========")
+            if p.exists():
+                print(p.read_text(encoding="utf-8", errors="replace")[-5000:])
+            else:
+                print("(missing)")
+
     def _run_script(path: Path, *, check: bool) -> None:
-        # Live logs in Colab; capture only when debugging failures is needed.
         result = subprocess.run(["bash", str(path)], env=env)
         if result.returncode != 0 and check:
+            _dump_host_logs()
             raise RuntimeError(
                 f"{path.name} failed (exit {result.returncode}). "
-                f"Check /tmp/ollama.log /tmp/litellm.log /tmp/cloudflared.log"
+                "See log dumps above."
             )
 
     _run_script(common / "stop.sh", check=False)
